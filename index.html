@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>College Review Hub</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+  <style>
+
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:Arial, sans-serif;
+    }
+
+    body{
+      background:#f3f4f6;
+      padding:20px;
+    }
+
+    h1{
+      text-align:center;
+      margin-bottom:20px;
+      color:#1e3a8a;
+    }
+
+    .container{
+      max-width:900px;
+      margin:auto;
+    }
+
+    .card{
+      background:white;
+      padding:20px;
+      border-radius:12px;
+      margin-bottom:20px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    input, textarea{
+      width:100%;
+      padding:12px;
+      margin-top:12px;
+      border-radius:8px;
+      border:1px solid #ccc;
+      font-size:15px;
+    }
+
+    textarea{
+      resize:vertical;
+    }
+
+    button{
+      margin-top:15px;
+      padding:12px 20px;
+      background:#2563eb;
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:15px;
+    }
+
+    button:hover{
+      background:#1d4ed8;
+    }
+
+    .review-card{
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      margin-top:15px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .review-card img{
+      width:100%;
+      max-height:300px;
+      object-fit:cover;
+      border-radius:10px;
+      margin-top:12px;
+    }
+
+    .branch{
+      display:inline-block;
+      background:#dbeafe;
+      color:#1e40af;
+      padding:5px 12px;
+      border-radius:20px;
+      margin-top:8px;
+      font-size:13px;
+    }
+
+    .rating{
+      color:#f59e0b;
+      margin-top:10px;
+      font-size:18px;
+    }
+
+    .search-box{
+      margin-bottom:20px;
+    }
+
+    .top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>College Review Hub</h1>
+
+    <!-- Add Review -->
+    <div class="card">
+
+      <h2>Add Review</h2>
+
+      <input 
+        type="text" 
+        id="collegeName" 
+        placeholder="College Name"
+      >
+
+      <input 
+        type="text" 
+        id="branch" 
+        placeholder="Your Branch (CSE, EE, ECE etc)"
+      >
+
+      <input 
+        type="number" 
+        id="rating" 
+        placeholder="Rating (1-5)"
+        min="1"
+        max="5"
+      >
+
+      <input 
+        type="file" 
+        id="collegeImage"
+        accept="image/*"
+      >
+
+      <textarea 
+        id="reviewText" 
+        rows="5" 
+        placeholder="Write your review..."
+      ></textarea>
+
+      <button onclick="submitReview()">
+        Post Review
+      </button>
+
+    </div>
+
+    <!-- Search -->
+    <div class="card search-box">
+
+      <h2>Search Reviews</h2>
+
+      <input 
+        type="text"
+        id="searchInput"
+        placeholder="Search by college name..."
+        onkeyup="searchReviews()"
+      >
+
+    </div>
+
+    <!-- Reviews -->
+    <div id="reviewsContainer"></div>
+
+  </div>
+
+  <script>
+
+    // =========================
+    // FIREBASE CONFIG
+    // =========================
+
+    // REPLACE WITH YOUR FIREBASE CONFIG
+
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "XXXXXX",
+      appId: "XXXXXX"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // =========================
+    // POST REVIEW
+    // =========================
+
+    async function submitReview(){
+
+      const collegeName = document.getElementById("collegeName").value;
+      const branch = document.getElementById("branch").value;
+      const rating = document.getElementById("rating").value;
+      const reviewText = document.getElementById("reviewText").value;
+
+      const imageFile = document.getElementById("collegeImage").files[0];
+
+      if(
+        !collegeName ||
+        !branch ||
+        !rating ||
+        !reviewText
+      ){
+        alert("Please fill all required fields");
+        return;
+      }
+
+      let imageUrl = "";
+
+      // Upload image
+      if(imageFile){
+
+        const storageRef = storage.ref();
+
+        const fileRef = storageRef.child(
+          "collegeImages/" +
+          Date.now() +
+          "_" +
+          imageFile.name
+        );
+
+        await fileRef.put(imageFile);
+
+        imageUrl = await fileRef.getDownloadURL();
+      }
+
+      // Save review
+      await db.collection("reviews").add({
+        collegeName,
+        branch,
+        rating,
+        reviewText,
+        imageUrl,
+        createdAt: new Date()
+      });
+
+      alert("Review Posted Successfully");
+
+      // Clear form
+      document.getElementById("collegeName").value = "";
+      document.getElementById("branch").value = "";
+      document.getElementById("rating").value = "";
+      document.getElementById("reviewText").value = "";
+      document.getElementById("collegeImage").value = "";
+
+      loadReviews();
+    }
+
+    // =========================
+    // LOAD REVIEWS
+    // =========================
+
+    async function loadReviews(){
+
+      const container =
+        document.getElementById("reviewsContainer");
+
+      container.innerHTML = "";
+
+      const snapshot = await db
+        .collection("reviews")
+        .orderBy("createdAt", "desc")
+        .get();
+
+      snapshot.forEach(doc => {
+
+        const data = doc.data();
+
+        let stars = "";
+
+        for(let i = 0; i < data.rating; i++){
+          stars += "⭐";
+        }
+
+        container.innerHTML += `
+
+          <div class="review-card">
+
+            <div class="top">
+              <h2>${data.collegeName}</h2>
+            </div>
+
+            <div class="branch">
+              ${data.branch}
+            </div>
+
+            <div class="rating">
+              ${stars}
+            </div>
+
+            <p style="margin-top:10px;">
+              ${data.reviewText}
+            </p>
+
+            ${
+              data.imageUrl
+              ?
+              `<img src="${data.imageUrl}" alt="College Image">`
+              :
+              ""
+            }
+
+          </div>
+
+        `;
+
+      });
+
+    }
+
+    // =========================
+    // SEARCH
+    // =========================
+
+    async function searchReviews(){
+
+      const searchValue =
+        document.getElementById("searchInput")
+        .value
+        .toLowerCase();
+
+      const container =
+        document.getElementById("reviewsContainer");
+
+      container.innerHTML = "";
+
+      const snapshot =
+        await db.collection("reviews").get();
+
+      snapshot.forEach(doc => {
+
+        const data = doc.data();
+
+        if(
+          data.collegeName
+          .toLowerCase()
+          .includes(searchValue)
+        ){
+
+          let stars = "";
+
+          for(let i = 0; i < data.rating; i++){
+            stars += "⭐";
+          }
+
+          container.innerHTML += `
+
+            <div class="review-card">
+
+              <div class="top">
+                <h2>${data.collegeName}</h2>
+              </div>
+
+              <div class="branch">
+                ${data.branch}
+              </div>
+
+              <div class="rating">
+                ${stars}
+              </div>
+
+              <p style="margin-top:10px;">
+                ${data.reviewText}
+              </p>
+
+              ${
+                data.imageUrl
+                ?
+                `<img src="${data.imageUrl}" alt="College Image">`
+                :
+                ""
+              }
+
+            </div>
+
+          `;
+
+        }
+
+      });
+
+    }
+
+    // =========================
+    // INITIAL LOAD
+    // =========================
+
+    loadReviews();
+
+  </script>
+
+</body>
+</html>
